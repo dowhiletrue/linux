@@ -17,6 +17,36 @@ Optional properties:
   - video-ports: 24 bits value which defines how the video controller
 	output is wired to the TDA998x input - default: <0x230145>
 
+	This property is not used when ports are defined.
+
+Optional nodes:
+
+  - port: up to three ports.
+	The ports are defined according to [1].
+
+    Video port.
+	There may be only one video port.
+	This one must contain the following property:
+
+	- port-type: must be "rgb"
+
+	and may contain the optional property:
+
+	- reg: 24 bits value which defines how the video controller
+		output is wired to the TDA998x input (video pins)
+		When absent, the default value is <0x230145>.
+
+    Audio ports.
+	There may be one or two audio ports.
+	These ones must contain the following properties:
+
+	- port-type: must be "i2s" or "spdif"
+
+	- reg: 8 bits value which defines how the audio controller
+		output is wired to the TDA998x input (audio pins)
+
+[1] Documentation/devicetree/bindings/graph.txt
+
 Example:
 
 	tda998x: hdmi-encoder {
@@ -26,4 +56,26 @@ Example:
 		interrupts = <27 2>;		/* falling edge */
 		pinctrl-0 = <&pmx_camera>;
 		pinctrl-names = "default";
+
+		port@230145 {
+			port-type = "rgb";
+			reg = <0x230145>;
+			hdmi_0: endpoint {
+				remote-endpoint = <&lcd0_0>;
+			};
+		};
+		port@3 {			/* AP1 = I2S */
+			port-type = "i2s";
+			reg = <0x03>;
+			tda998x_i2s: endpoint {
+				remote-endpoint = <&audio1_i2s>;
+			};
+		};
+		port@4 {			 /* AP2 = S/PDIF */
+			port-type = "spdif";
+			reg = <0x04>;
+			tda998x_spdif: endpoint {
+				remote-endpoint = <&audio1_spdif1>;
+			};
+		};
 	};

@@ -145,6 +145,11 @@ static int kirkwood_i2s_hw_params(struct snd_pcm_substream *substream,
 	unsigned int i2s_reg;
 	unsigned long i2s_value;
 
+//test:trace
+pr_info("kirkwood audio hw %s sub %p %p fmt %d rate %d\n",
+ dai->name, priv->substream_play, substream,
+ params_format(params), params_rate(params));
+
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		i2s_reg = KIRKWOOD_I2S_PLAYCTL;
 	} else {
@@ -263,7 +268,7 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_START:
 		/* configure */
 		ctl = priv->ctl_play;
-		if (dai->id == 0)
+		if (dai->name[0] == 'i')
 			ctl &= ~KIRKWOOD_PLAYCTL_SPDIF_EN;	/* i2s */
 		else
 			ctl &= ~KIRKWOOD_PLAYCTL_I2S_EN;	/* spdif */
@@ -331,7 +336,7 @@ static int kirkwood_i2s_rec_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_START:
 		/* configure */
 		ctl = priv->ctl_rec;
-		if (dai->id == 0)
+		if (dai->name[0] == 'i')
 			ctl &= ~KIRKWOOD_RECCTL_SPDIF_EN;	/* i2s */
 		else
 			ctl &= ~KIRKWOOD_RECCTL_I2S_EN;		/* spdif */
@@ -392,8 +397,6 @@ static int kirkwood_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 		return kirkwood_i2s_play_trigger(substream, cmd, dai);
 	else
 		return kirkwood_i2s_rec_trigger(substream, cmd, dai);
-
-	return 0;
 }
 
 static int kirkwood_i2s_init(struct kirkwood_dma_data *priv)
@@ -438,49 +441,8 @@ static const struct snd_soc_dai_ops kirkwood_i2s_dai_ops = {
 	.set_fmt        = kirkwood_i2s_set_fmt,
 };
 
-static struct snd_soc_dai_driver kirkwood_i2s_dai[2] = {
-    {
-	.name = "i2s",
-	.id = 0,
-	.playback = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
-				SNDRV_PCM_RATE_96000,
-		.formats = KIRKWOOD_I2S_FORMATS,
-	},
-	.capture = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
-				SNDRV_PCM_RATE_96000,
-		.formats = KIRKWOOD_I2S_FORMATS,
-	},
-	.ops = &kirkwood_i2s_dai_ops,
-    },
-    {
-	.name = "spdif",
-	.id = 1,
-	.playback = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
-				SNDRV_PCM_RATE_96000,
-		.formats = KIRKWOOD_SPDIF_FORMATS,
-	},
-	.capture = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
-				SNDRV_PCM_RATE_96000,
-		.formats = KIRKWOOD_SPDIF_FORMATS,
-	},
-	.ops = &kirkwood_i2s_dai_ops,
-    },
-};
-
-static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[2] = {
-    {
+/* DAI sample for I2S and external clock */
+static struct snd_soc_dai_driver kirkwood_i2s_dai_i2s_ext = {
 	.name = "i2s",
 	.id = 0,
 	.playback = {
@@ -500,42 +462,81 @@ static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[2] = {
 		.formats = KIRKWOOD_I2S_FORMATS,
 	},
 	.ops = &kirkwood_i2s_dai_ops,
-    },
-    {
-	.name = "spdif",
-	.id = 1,
-	.playback = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_CONTINUOUS,
-		.rate_min = 5512,
-		.rate_max = 192000,
-		.formats = KIRKWOOD_SPDIF_FORMATS,
-	},
-	.capture = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_CONTINUOUS,
-		.rate_min = 5512,
-		.rate_max = 192000,
-		.formats = KIRKWOOD_SPDIF_FORMATS,
-	},
-	.ops = &kirkwood_i2s_dai_ops,
-    },
 };
 
 static const struct snd_soc_component_driver kirkwood_i2s_component = {
 	.name		= DRV_NAME,
 };
 
+/* create the DAIs */
+static int kirkwood_i2s_create_dais(struct device_node *np,
+				struct kirkwood_dma_data *priv)
+{
+	struct device_node *of_port;
+	const char *name;
+	int i, ret, ndai, dai[2];
+
+	ndai = 0;
+	if (np) {
+		for_each_child_of_node(np, of_port) {
+			if (!of_port->name ||
+			     of_node_cmp(of_port->name, "port") != 0)
+				continue;
+			ret = of_property_read_string(of_port,
+						"port-type",
+						&name);
+			if (ret)
+				continue;
+			if (strcmp(name, "i2s") == 0) {
+				dai[ndai] = 0;
+			} else if (strcmp(name, "spdif") == 0) {
+				dai[ndai] = 1;
+			} else {
+				continue;
+			}
+			if (++ndai >= 2)
+				break;
+		}
+	}
+	if (ndai == 0) {		/* no DT or no port */
+		ndai = 2;
+		dai[0] = 0;		/* i2s(0) - spdif(1) */
+		dai[1] = 1;
+	} else {
+		priv->is_graph = 1;	/* graph of the ports */
+	}
+	for (i = 0; i < ndai; i++) {
+		memcpy(&priv->dais[i], &kirkwood_i2s_dai_i2s_ext,
+				sizeof(priv->dais[0]));
+		priv->dais[i].id = i;
+		if (dai[i] == 1) {
+			priv->dais[i].name = "spdif";
+			priv->dais[i].playback.formats =
+						KIRKWOOD_SPDIF_FORMATS;
+			priv->dais[i].capture.formats =
+						KIRKWOOD_SPDIF_FORMATS;
+		}
+		if (IS_ERR(priv->extclk)) {
+			priv->dais[i].playback.rates =
+						SNDRV_PCM_RATE_44100 |
+						SNDRV_PCM_RATE_48000 |
+						SNDRV_PCM_RATE_96000;
+			priv->dais[i].capture.rates =
+						SNDRV_PCM_RATE_44100 |
+						SNDRV_PCM_RATE_48000 |
+						SNDRV_PCM_RATE_96000;
+		}
+	}
+	return ndai;
+}
+
 static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
 {
 	struct kirkwood_asoc_platform_data *data = pdev->dev.platform_data;
-	struct snd_soc_dai_driver *soc_dai = kirkwood_i2s_dai;
 	struct kirkwood_dma_data *priv;
 	struct resource *mem;
 	struct device_node *np = pdev->dev.of_node;
-	int err;
+	int err, ndais;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
@@ -585,7 +586,6 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
 		} else {
 			dev_info(&pdev->dev, "found external clock\n");
 			clk_prepare_enable(priv->extclk);
-			soc_dai = kirkwood_i2s_dai_extclk;
 		}
 	}
 
@@ -602,8 +602,10 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
 		priv->ctl_rec |= KIRKWOOD_RECCTL_BURST_128;
 	}
 
+	ndais = kirkwood_i2s_create_dais(np, priv);
+
 	err = snd_soc_register_component(&pdev->dev, &kirkwood_i2s_component,
-					 soc_dai, 2);
+					 priv->dais, ndais);
 	if (err) {
 		dev_err(&pdev->dev, "snd_soc_register_component failed\n");
 		goto err_component;
@@ -617,7 +619,29 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
 
 	kirkwood_i2s_init(priv);
 
+	/*
+	 * If the DT contains the graph of the audio ports,
+	 * let asoc-dt-card create the sound card.
+	 */
+	if (priv->is_graph) {
+		priv->card_pdev = platform_device_register_resndata(&pdev->dev,
+						"asoc-dt-card",
+						PLATFORM_DEVID_NONE,
+						NULL, 0,
+						&np, sizeof(np));
+		if (IS_ERR(priv->card_pdev)) {
+			err =  PTR_ERR(priv->card_pdev);
+			dev_err(&pdev->dev, "cannot create audio card %d\n",
+					err);
+			priv->card_pdev = NULL;
+			goto err_card;
+		}
+		priv->card_pdev = pdev;
+	}
+
 	return 0;
+ err_card:
+	snd_soc_unregister_platform(&pdev->dev);
  err_platform:
 	snd_soc_unregister_component(&pdev->dev);
  err_component:
@@ -631,6 +655,9 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
 static int kirkwood_i2s_dev_remove(struct platform_device *pdev)
 {
 	struct kirkwood_dma_data *priv = dev_get_drvdata(&pdev->dev);
+
+	if (priv->card_pdev)
+		platform_device_unregister(priv->card_pdev);
 
 	snd_soc_unregister_platform(&pdev->dev);
 	snd_soc_unregister_component(&pdev->dev);

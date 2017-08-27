@@ -1,6 +1,7 @@
 /dts-v1/;
 
 #include "dove.dtsi"
+#include <dt-bindings/interrupt-controller/irq.h>
 
 / {
 	model = "SolidRun CuBox";
@@ -62,6 +63,20 @@
 		pinctrl-0 = <&pmx_gpio_19>;
 		pinctrl-names = "default";
 	};
+	spdif_codec: spdif-codec {		/* optical output */
+		compatible = "linux,spdif-dit";
+		port {
+			port-type = "spdif";
+			spdif_out: endpoint {
+				remote-endpoint = <&audio1_spdif0>;
+			};
+		};
+	};
+
+	video {
+		compatible = "marvell,dove-video";
+		marvell,video-devices = <&lcd0>;
+	};
 };
 
 &uart0 { status = "okay"; };
@@ -74,8 +89,8 @@
 	reg = <1>;
 };
 
-&i2c0 {
-	status = "okay";
+&i2c {
+//	status = "okay";
 	clock-frequency = <100000>;
 
 	si5351: clock-generator {
@@ -108,6 +123,37 @@
 			silabs,pll-master;
 		};
 	};
+	hdmi: hdmi-encoder {
+		compatible = "nxp,tda998x";
+		reg = <0x70>;
+		interrupt-parent = <&gpio0>;
+		interrupts = <27 IRQ_TYPE_EDGE_FALLING>;
+		pinctrl-0 = <&pmx_camera>;
+		pinctrl-names = "default";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		port@230145 {
+			port-type = "rgb";
+			reg = <0x230145>;
+			hdmi_0: endpoint {
+				remote-endpoint = <&lcd0_0>;
+			};
+		};
+		port@3 {			/* AP1 = I2S */
+			port-type = "i2s";
+			reg = <0x03>;
+			tda998x_i2s: endpoint {
+				remote-endpoint = <&audio1_i2s>;
+			};
+		};
+		port@4 {			 /* AP2 = S/PDIF */
+			port-type = "spdif";
+			reg = <0x04>;
+			tda998x_spdif: endpoint {
+				remote-endpoint = <&audio1_spdif1>;
+			};
+		};
+	};
 };
 
 &sdio0 {
@@ -129,6 +175,40 @@
 	status = "okay";
 	clocks = <&gate_clk 13>, <&si5351 2>;
 	clock-names = "internal", "extclk";
+//	clocks = <&gate_clk 13>;
+//	clock-names = "internal";
 	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_audio1_extclk>;
 	pinctrl-names = "default";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	dt-audio-card,format = "i2s";
+	port@0 {
+		port-type = "spdif";
+		audio1_spdif0: endpoint@0 {
+			remote-endpoint = <&spdif_out>;
+		};
+		audio1_spdif1: endpoint@1 {
+			remote-endpoint = <&tda998x_spdif>;
+		};
+	};
+	port@1 {
+		port-type = "i2s";
+		audio1_i2s: endpoint {
+			remote-endpoint = <&tda998x_i2s>;
+		};
+	};
+};
+
+&lcd0 {
+	status = "okay";
+	clocks = <&si5351 0>;
+	clock-names = "ext_ref_clk1";
+// (same as plldivider)
+//	clocks = <&core_clk 3>;
+//	clock-names = "axibus";
+	port {
+		lcd0_0: endpoint {
+			remote-endpoint = <&hdmi_0>;
+		};
+	};
 };

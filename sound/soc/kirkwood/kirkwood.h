@@ -135,12 +135,15 @@ struct kirkwood_dma_data {
 	void __iomem *io;
 	struct clk *clk;
 	struct clk *extclk;
+	struct platform_device *card_pdev;
+	struct snd_soc_dai_driver dais[2];
 	uint32_t ctl_play;
 	uint32_t ctl_rec;
 	struct snd_pcm_substream *substream_play;
 	struct snd_pcm_substream *substream_rec;
 	int irq;
-	int burst;
+	short burst;
+	short is_graph;
 };
 
 extern struct snd_soc_platform_driver kirkwood_soc_platform;
