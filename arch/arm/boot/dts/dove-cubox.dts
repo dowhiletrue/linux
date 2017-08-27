@@ -146,13 +146,6 @@
 				remote-endpoint = <&audio1_i2s>;
 			};
 		};
-		port@4 {			 /* AP2 = S/PDIF */
-			port-type = "spdif";
-			reg = <0x04>;
-			tda998x_spdif: endpoint {
-				remote-endpoint = <&audio1_spdif1>;
-			};
-		};
 	};
 };
 
@@ -186,9 +179,6 @@
 		port-type = "spdif";
 		audio1_spdif0: endpoint@0 {
 			remote-endpoint = <&spdif_out>;
-		};
-		audio1_spdif1: endpoint@1 {
-			remote-endpoint = <&tda998x_spdif>;
 		};
 	};
 	port@1 {
