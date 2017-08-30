@@ -1,0 +1,173 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html> <head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>Jef Moine - Cubox stuff</title>
+</head>
+
+<body bgcolor="#faf0e6">
+
+<h2>Audio and video on the Cubox - J.F. Moine - September 15, 2015</h2>
+
+This directory contains the required stuff to have audio and video on the Cubox
+with a kernel 4.3-rc1 (no acceleration).
+
+<h3>Kernel</h3>
+
+<ul>
+<li>get the source of the kernel
+
+<li>apply the kernel patches
+	<a href="cubox-4.3.0-rc1-1.patch">cubox-4.3.0-rc1-1.patch</a>
+    and <a href="cubox-4.3.0-rc1-2.patch">cubox-4.3.0-rc1-2.patch</a>
+
+<li>copy the file <a href="config.txt">config.txt</a> file to
+	&lt;kernel root&gt;/.config
+
+<li> from the &lt;kernel root&gt;, do:
+<pre>
+	make menuconfig		# to adapt your USB devices and other stuff
+	make zImage
+	make dtbs
+	cd arch/arm/boot
+	cat zImage dts/dove-cubox.dtb > zImage.cubox
+	mkimage -A arm -O linux -C none  -T kernel -a 0x00008000 -e 0x00008000 \
+		-n 'Linux-cubox' -d zImage.cubox uImage
+	cd -
+	make modules
+	sudo make modules_install
+</pre>
+
+<li>then, copy the
+<pre>		<kernel root>/arch/arm/boot/uImage</pre>
+	to your u-boot partition
+</ul>
+
+<h3>Boot</h3>
+
+The u-boot "boot.scr" script must have a bootargs as:
+<pre>	console=ttyS0,115200n8 console=tty1,115200 root=/dev/sda2 rootwait video=HDMI-A-1:1920x1080-32@60</pre>
+  (the most important is the video= parameter)
+
+<h3>X11</h3>
+
+You must use the standard xorg "modesetting" video driver (not 'fbdev').<br>
+Here is a <a href="xorg.conf">copy of my xorg.conf</a> to copy in /etc/X11/.<br>
+Mainly, it would have:
+<ul>
+<li>in the section "Device"
+<pre>	Driver "modesetting"</pre>
+
+<li>
+in the section "Screen"
+<pre>	DefaultFbBpp 32</pre>
+</ul>
+Note: "modesetting" does not work anymore with my Debian sid.<br>
+	You may use the driver <a href="myms_drv.so">myms_drv.so</a>
+	(MY ModeSetting) which has support for video overlay
+	(the source is <a href="myms.tar.gz">here</a>).<br>
+	xorg.conf must contain:
+<pre>	Driver	"myms"
+	Option	"kmsdev" "/dev/dri/card0"
+	Option	"ShadowFB" "false"
+	Option	"SWcursor" "false"
+	Option	"Monitor-HDMI-0" "monitor"</pre>
+
+<h3>Hints</h3>
+
+<ul>
+<li>random black screen with HDMI
+<p>
+	Sometimes, the HDMI display stays black at system startup.
+<p>
+	If you are sure the system is running, you may start blindly playing
+	some sound and the screen should change to normal.
+<p>
+	If you don't know, use  SysRq 'x' (press Alt-SysRq and then Alt-x).
+	This toggles the HDMI transmission from HDMI to DVI.
+	In DVI mode, you have no sound. If you play something, the HDMI
+	mode should work again and you may switch back with the SysRq 'x'.
+	Note also that the HDMI mode may imply video overscan. Switching to
+	DVI may give you a normal screen (no lost pixels).
+</ul>
+
+<h3>History</h3>
+
+<table>
+<tr valign="top"><td>15/09/15<td>
+	- kernel 4.3.0-rc1
+<tr valign="top"><td>15/05/01<td>
+	- kernel 4.1.0-rc1<br>
+	- sound output on both HDMI and S/PDIF, or S/PDIF only<br>
+	- remove CEC stuff
+<tr valign="top"><td>15/01/06<td>
+	- kernel 3.19.0-rc1<br>
+	- fix EDID timeout when HDMI disconnect/reconnect in console mode
+<tr valign="top"><td>14/11/22<td>
+	- add cec in tda998x (not tested)<br>
+	- add cec (rmk driver)<br>
+	- add lirc (config)
+<tr valign="top"><td>14/10/24<td>
+	- kernel 3.18.0-rc1<br>
+	- audio now goes to both HDMI and S/PDIF by default
+<tr valign="top"><td>14/08/31<td>
+	- kernel 3.17.0-rc1<br>
+	- fix some small bugs found by oneshotquestion (cubox forum)
+<tr valign="top"><td>14/08/08<td>
+	- kernel 3.16.0
+<tr valign="top"><td>14/07/05<td>
+	- kernel 3.16.0-rc3
+<tr valign="top"><td>14/06/19<td>
+	- audio ok (HDMI and S/PDIF)<br>
+	- video overlay (with the X11 video driver myms_drv.so)<br>
+	- kernel 3.15.0-rc7
+<tr valign="top"><td>13/09/18<td>
+	- SysRq 'x' (hdmi toggle) added<br>
+	- audio ok (no S/PDIF)<br>
+	- fix more dove-drm init problems<br>
+	- no more lost pixels on the left side of the screen<br>
+	- kernel 3.12.0-rc1
+<tr valign="top"><td>13/05/19<td>
+	- i2c-mv64xxx driver changes from Russell King
+<tr valign="top"><td>13/05/16<td>
+	- si5351 clock<br>
+	- hardware cursor<br>
+	- interlaced modes (not tested)<br>
+	- fix again some dove-drm init problems<br>
+	- kernel 3.10.0-rc1
+<tr valign="top"><td>13/04/30<td>
+	- more audio stuff, but still no sound<br>
+	- fix dove-drm init problems<br>
+	- kernel 3.9.0
+<tr valign="top"><td>13/04/24<td>
+	- only one kernel patch, no more driver out of tree<br>
+	- HDMI exchanges by interrupts<br>
+	- use 'modesetting' instead of 'fbdev' for X11<br>
+	- have 'xrandr' working<br>
+	- kernel 3.9-rc8
+<tr valign="top"><td>13/03/27<td>
+	- use the AXI clock (no need for the si5351 anymore)<br>
+	- fix a bug in the LCD horizontal and vertical synchronization<br>
+	- preparation of video overlay, hardware cursor and audio
+		but not yet working<br>
+	- kernel 3.9-rc4
+<tr valign="top"><td>version 5<td>
+	- dove DRM video driver<br>
+	- nxp tda998x (HDMI) in the kernel<br>
+	- kernel 3.9-rc1
+<tr valign="top"><td>version 4<td>
+	- full LCD resources in cubox DT<br>
+	- avoid TDA errors<br>
+	- kernel 3.8.0
+<tr valign="top"><td>version 3<td>
+	- create a link to drivers/video/edid.h
+<tr valign="top"><td>version 2<td>
+	- drivers generation out of the kernel tree<br>
+	- some enhancements (I don't remember which!)<br>
+	- kernel 3.8-rc6
+<tr valign="top"><td>version 1<td>
+	- kernel 3.8-rc4<br>
+	- drivers in the kernel tree
+</table>
+
+</body>
+</html>
