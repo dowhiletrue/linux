@@ -16,6 +16,7 @@ RUN apt-get update               \
     u-boot-tools                 \
     wget                         \
     xz-utils                     \
+    kmod                        \
  && apt-get clean
 
 
