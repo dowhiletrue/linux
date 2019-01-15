@@ -12,3 +12,4 @@ mkimage -A arm -O linux -C none  -T kernel -a 0x00008000 -e 0x00008000 -n 'Linux
 cd -
 make modules
 make modules_install
+depmod -b "4.3.0-rc1" -F System.map 4.3.0-rc1
